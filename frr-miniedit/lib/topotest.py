@@ -772,7 +772,8 @@ class Router(Node):
         # If this topology is using old API and doesn't have logdir
         # specified, then attempt to generate an unique logdir.
         if self.logdir is None:
-            cur_test = os.environ["PYTEST_CURRENT_TEST"]
+            # cur_test = os.environ["PYTEST_CURRENT_TEST"]
+            cur_test = "miniedit_topology"
             self.logdir = "/tmp/topotests/" + cur_test[
                 0 : cur_test.find(".py")
             ].replace("/", ".")
@@ -787,18 +788,18 @@ class Router(Node):
         self.hasmpls = False
         self.routertype = "frr"
         self.daemons = {
-            "zebra": 0,
+            "zebra": 1,
             "ripd": 0,
             "ripngd": 0,
             "ospfd": 0,
             "ospf6d": 0,
             "isisd": 0,
-            "bgpd": 0,
+            "bgpd": 1,
             "pimd": 0,
             "ldpd": 0,
             "eigrpd": 0,
             "nhrpd": 0,
-            "staticd": 0,
+            "staticd": 1,
             "bfdd": 0,
             "sharpd": 0,
         }
