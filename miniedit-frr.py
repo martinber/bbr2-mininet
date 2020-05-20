@@ -120,7 +120,7 @@ HOSTS = { 'proc': Host,
           'rt': custom( CPULimitedHost, sched='rt' ),
           'cfs': custom( CPULimitedHost, sched='cfs' ) }
 
-from topotest import Router as LegacyRouter
+from lib.topotest import Router as LegacyRouter
 
 
 class InbandController( RemoteController ):
@@ -2805,7 +2805,8 @@ class MiniEdit( Frame ):
             elif 'LegacySwitch' in tags:
                 newSwitch = net.addSwitch( name , cls=LegacySwitch)
             elif 'LegacyRouter' in tags:
-                newSwitch = net.addHost( name , cls=LegacyRouter)
+                newSwitch = net.addHost( name , cls=LegacyRouter,
+                      privateDirs=["/etc/frr", "/var/run/frr", "/var/log"])
             elif 'Host' in tags:
                 opts = self.hostOpts[name]
                 #print str(opts)
@@ -3066,6 +3067,9 @@ class MiniEdit( Frame ):
                     self.net.get(name).start( switchControllers )
                 if 'LegacySwitch' in tags:
                     self.net.get(name).start( [] )
+                    info( name + ' ')
+                if 'LegacyRouter' in tags:
+                    self.net.get(name).startRouter( [] )
                     info( name + ' ')
             info('\n')
 
