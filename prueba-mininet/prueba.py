@@ -10,6 +10,8 @@ from mininet.log import setLogLevel, info
 from mininet.link import TCLink, Intf
 from subprocess import call
 
+import time
+
 def myNetwork():
 
     net = Mininet( topo=None,
@@ -43,14 +45,20 @@ def myNetwork():
     info( '*** Tests\n')
     h1.cmd("cd ~/Desktop/lib")
     h1.cmdPrint("ps")
-    h1.cmdPrint("python3 -m http.server 8080 &")
-    h1.cmdPrint("ps")
+    # h1.cmd("python3 -m http.server 8080")
+    #
+    # h2.cmd("mkdir -p /tmp/mininet")
+    # h2.cmd("cd /tmp/mininet")
+    # h2.cmdPrint("wget -r http://10.0.0.1:8080")
+    #
+    # h1.cmdPrint("killall python3")
+
+    h1.cmd("iperf3 -s &")
+    h2.cmdPrint("iperf3 -c 10.0.0.1")
+    h1.sendInt()
+    time.sleep(2)
+    print h1.waiting
     h1.cmdPrint("netstat -lp")
-
-    h2.cmd("mkdir -p /tmp/mininet")
-    h2.cmd("cd /tmp/mininet")
-    h2.cmdPrint("wget -r http://10.0.0.1:8080")
-
     # CLI(net)
     net.pingAll()
     net.iperf()
