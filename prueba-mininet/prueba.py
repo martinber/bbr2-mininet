@@ -12,42 +12,70 @@ from subprocess import call
 
 import time
 
+class MiHost(Host):
+    """
+    Host con algunas funciones mas.
+
+    Hay varias funciones para correr comandos. Ademas de las defidas en esta
+    clase, usamos:
+
+    - self.cmd(): Correr un comando comun y esperar a que termine.
+
+    - self.cmdPrint(): Correr un comando mostrando la salida y esperar a que
+      termine.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(MiHost, self).__init__(*args, **kwargs)
+
+    def config(self, **params):
+        super(MiHost, self).config(**params)
+
+    def bgCmd(self, *cmd):
+        """
+        Corre un comando en el fondo y devuelve su PID.
+        """
+        cmd = cmd + ("&",)
+        self.cmd(*cmd)
+        return int(self.cmd("echo $!"))
+
+    def killPid(self, pid):
+        """
+        Mata un proceso dado su PID.
+        """
+        self.cmd("kill", pid)
+
 def myNetwork():
 
     net = Mininet( topo=None,
                    build=False,
                    ipBase='10.0.0.0/8')
 
-    info( '*** Add switches\n')
+    info( '*** Iniciando\n')
     s1 = net.addSwitch('s1', cls=OVSKernelSwitch, failMode='standalone')
 
-    info( '*** Add hosts\n')
-    h1 = net.addHost('h1', cls=Host, ip='10.0.0.1', defaultRoute=None)
-    h2 = net.addHost('h2', cls=Host, ip='10.0.0.2', defaultRoute=None)
+    h1 = net.addHost('h1', cls=MiHost, ip='10.0.0.1', defaultRoute=None)
+    h2 = net.addHost('h2', cls=MiHost, ip='10.0.0.2', defaultRoute=None)
 
-    info( '*** Add links\n')
     net.addLink(h1, s1)
     net.addLink(h2, s1)
 
-    info( '*** Starting network\n')
     net.build()
 
-    info( '*** Starting controllers\n')
     for controller in net.controllers:
         controller.start()
 
-    info( '*** Starting switches\n')
     net.get('s1').start([])
 
-    info( '*** Post configure switches and hosts\n')
+    info( '*** Realizar pruebas\n')
 
+    # --------------------------------------------------------------------------
+    # Servidor HTTP
 
-    info( '*** Tests\n')
     h1.cmd("cd /etc/apt/")
     h1.cmdPrint("ls")
 
-    h1.cmd("python3 -m http.server 8080 &")
-    pid_python3 = int(h1.cmd("echo $!"))
+    pid_py3 = h1.bgCmd("python3 -m http.server 8080")
     time.sleep(1)
 
     h2.cmd("rm -r /tmp/mininet")
@@ -57,13 +85,28 @@ def myNetwork():
     h2.cmdPrint("wget -r http://10.0.0.1:8080")
     h2.cmdPrint("ls")
 
-    h1.cmd("kill", pid_python3)
+    h1.killPid(pid_py3)
+
+    # --------------------------------------------------------------------------
+    # Iperf3
+
+    h1.bgCmd("iperf3 -s")
+    time.sleep(1)
+
+    h2.cmdPrint("iperf3 -c 10.0.0.1")
+
+    h1.killPid(pid_py3)
+
+    # --------------------------------------------------------------------------
+    # Ver que se hayan cerrado los procesos
 
     time.sleep(1)
     if h1.waiting:
         print "h1 no salio"
     if h2.waiting:
         print "h2 no salio"
+    if not h1.waiting and not h2.waiting:
+        print "Todo bien"
 
 if __name__ == '__main__':
     setLogLevel( 'info' )
