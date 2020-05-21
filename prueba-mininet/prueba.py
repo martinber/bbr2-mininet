@@ -43,26 +43,27 @@ def myNetwork():
 
 
     info( '*** Tests\n')
-    h1.cmd("cd ~/Desktop/lib")
-    h1.cmdPrint("ps")
-    # h1.cmd("python3 -m http.server 8080")
-    #
-    # h2.cmd("mkdir -p /tmp/mininet")
-    # h2.cmd("cd /tmp/mininet")
-    # h2.cmdPrint("wget -r http://10.0.0.1:8080")
-    #
-    # h1.cmdPrint("killall python3")
+    h1.cmd("cd /etc/apt/")
+    h1.cmdPrint("ls")
 
-    h1.cmd("iperf3 -s &")
-    h2.cmdPrint("iperf3 -c 10.0.0.1")
-    h1.sendInt()
-    time.sleep(2)
-    print h1.waiting
-    h1.cmdPrint("netstat -lp")
-    # CLI(net)
-    net.pingAll()
-    net.iperf()
-    net.stop()
+    h1.cmd("python3 -m http.server 8080 &")
+    pid_python3 = int(h1.cmd("echo $!"))
+    time.sleep(1)
+
+    h2.cmd("rm -r /tmp/mininet")
+    h2.cmd("mkdir -p /tmp/mininet")
+    h2.cmd("cd /tmp/mininet")
+    h2.cmdPrint("ls")
+    h2.cmdPrint("wget -r http://10.0.0.1:8080")
+    h2.cmdPrint("ls")
+
+    h1.cmd("kill", pid_python3)
+
+    time.sleep(1)
+    if h1.waiting:
+        print "h1 no salio"
+    if h2.waiting:
+        print "h2 no salio"
 
 if __name__ == '__main__':
     setLogLevel( 'info' )
