@@ -70,6 +70,24 @@ def myNetwork():
     info( '*** Realizar pruebas\n')
 
     # --------------------------------------------------------------------------
+    # Inicializar
+
+    h1.cmd("modprobe tcp_bbr")
+    h2.cmd("modprobe tcp_bbr")
+
+    # --------------------------------------------------------------------------
+    # Crear carpetas temporales y moverse ahi
+
+    h1.cmd("rm -r /tmp/mininet")
+    h1.cmd("mkdir -p /tmp/mininet/h1")
+    h1.cmd("cd /tmp/mininet/h1")
+
+    h2.cmd("mkdir -p /tmp/mininet/h2")
+    h2.cmd("cd /tmp/mininet/h2")
+
+    h1.cmd("mkdir -p ~/resultados/")
+
+    # --------------------------------------------------------------------------
     # Servidor HTTP
 
     h1.cmd("cd /etc/apt/")
@@ -78,9 +96,6 @@ def myNetwork():
     pid_py3 = h1.bgCmd("python3 -m http.server 8080")
     time.sleep(1)
 
-    h2.cmd("rm -r /tmp/mininet")
-    h2.cmd("mkdir -p /tmp/mininet")
-    h2.cmd("cd /tmp/mininet")
     h2.cmdPrint("ls")
     h2.cmdPrint("wget -r http://10.0.0.1:8080")
     h2.cmdPrint("ls")
@@ -89,13 +104,18 @@ def myNetwork():
 
     # --------------------------------------------------------------------------
     # Iperf3
+    # Cliente manda a servidor
 
-    h1.bgCmd("iperf3 -s")
+    pid_iperf = h2.bgCmd("iperf3 -s")
     time.sleep(1)
 
-    h2.cmdPrint("iperf3 -c 10.0.0.1")
+    pid_tcpdump = h1.bgCmd("tcpdump -i h1-eth0 -w ./trace.pcap")
+    h1.cmdPrint("iperf3 -c 10.0.0.2")
 
-    h1.killPid(pid_py3)
+    h1.killPid(pid_tcpdump)
+    h2.killPid(pid_iperf)
+
+    h1.cmdPrint("captcp statistic trace.pcap")
 
     # --------------------------------------------------------------------------
     # Ver que se hayan cerrado los procesos
