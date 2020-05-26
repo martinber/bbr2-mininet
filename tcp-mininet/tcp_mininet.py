@@ -10,6 +10,8 @@ from mininet.log import setLogLevel, info
 from mininet.link import TCLink, Intf
 from subprocess import call
 
+import parse
+
 import time
 
 class MiHost(Host):
@@ -44,30 +46,6 @@ class MiHost(Host):
         Mata un proceso dado su PID.
         """
         self.cmd("kill", pid)
-
-def parse_captcp_stat(text):
-
-    def group(iterator, count):
-        itr = iter(iterator)
-        while True:
-            yield tuple([itr.next() for i in range(count)])
-
-
-    flow = ("0.1", 0)
-
-    for lines in group(iter(text.splitlines()), 3):
-        flow1 = lines[0].strip().split()[1]
-        flow2 = lines[1].strip().split()[1]
-        print(lines[2].strip().split())
-        data1 = int(lines[2].strip().split()[3])
-        data2 = int(lines[2].strip().split()[8])
-
-        if data1 > flow[1]:
-            flow = (flow1, data1)
-        if data2 > flow[1]:
-            flow = (flow2, data2)
-
-    return flow[0]
 
 def myNetwork():
 
@@ -148,9 +126,9 @@ def myNetwork():
     h1.cmdPrint("pwd")
     h2.cmdPrint("pwd")
 
-    salida = h1.cmd("captcp statistic ./trace.pcap | grep -E 'Flow|Data application layer'")
-    print(salida)
-    print parse_captcp_stat(salida)
+    salida = h1.cmd("captcp statistic ./trace.pcap | grep -E 'Flow|Data application layer' | ansi2txt")
+    print salida
+    print parse.parse_captcp_stat(salida)
 
 
     # --------------------------------------------------------------------------
