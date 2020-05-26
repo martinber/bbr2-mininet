@@ -43,7 +43,6 @@ def parse_captcp_stat(text):
     flow = ("0.1", 0)
 
     for lines in group(iter(text.splitlines()), 3):
-        print lines
         flow1 = lines[0].strip().split()[1]
         flow2 = lines[1].strip().split()[1]
         data1 = int(lines[2].strip().split()[3])
@@ -51,10 +50,8 @@ def parse_captcp_stat(text):
 
         if data1 > flow[1]:
             flow = (flow1, data1)
-            print "Nuevo mejor", flow
         if data2 > flow[1]:
             flow = (flow2, data2)
-            print "Nuevo mejor", flow
 
 
     return flow[0]

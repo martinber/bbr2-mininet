@@ -96,18 +96,18 @@ def myNetwork():
 
     # pushd hace cd a una carpeta. Lo que tiene de bueno es que cuando use popd
     # puedo volver a la carpeta anterior
-    h1.cmd("pushd /etc/apt/")
-    h1.cmdPrint("ls")
+    #h1.cmd("pushd /etc/apt/")
+    #h1.cmdPrint("ls")
 
-    pid_py3 = h1.bgCmd("python3 -m http.server 8080")
-    time.sleep(1)
+    #pid_py3 = h1.bgCmd("python3 -m http.server 8080")
+    #time.sleep(1)
 
-    h2.cmdPrint("ls")
-    h2.cmdPrint("wget -r http://10.0.0.1:8080")
-    h2.cmdPrint("ls")
+    #h2.cmdPrint("ls")
+    #h2.cmdPrint("wget -r http://10.0.0.1:8080")
+    #h2.cmdPrint("ls")
 
-    h1.killPid(pid_py3)
-    h1.cmd("popd")
+    #h1.killPid(pid_py3)
+    #h1.cmd("popd")
 
     # --------------------------------------------------------------------------
     # Iperf3
@@ -125,22 +125,55 @@ def myNetwork():
 
     h1.cmdPrint("pwd")
     h2.cmdPrint("pwd")
+    
+    # Determinar el numero de flow capturado
 
     salida = h1.cmd("captcp statistic ./trace.pcap | grep -E 'Flow|Data application layer' | ansi2txt")
-    print salida
-    print parse.parse_captcp_stat(salida)
+    flow = parse.parse_captcp_stat(salida)
+    
+    # Graficar throughput
+
+    h1.cmd('mkdir -p "./captcp_throughput"')
+    h1.cmd(
+        "captcp throughput -s {sample_len} -i -u Mbit \
+        -f {flow} -o {output_dir} {pcap}".format(
+            sample_len="0.1",
+            flow=flow,
+            output_dir="./captcp_throughput",
+            pcap="./trace.pcap"
+        )
+    )
+    h1.cmd("pushd ./captcp_throughput")
+    h1.cmd("make")
+    h1.cmd("popd")
+    
+    # Graficar inflight
+
+    h1.cmd('mkdir -p "./captcp_inflight"')
+    h1.cmd(
+        "captcp inflight -i -f {flow} -o {output_dir} {pcap}".format(
+            flow=flow,
+            output_dir="./captcp_inflight",
+            pcap="./trace.pcap"
+        )
+    )
+    h1.cmd("pushd ./captcp_inflight")
+    h1.cmd("make")
+    h1.cmd("popd")
+
 
 
     # --------------------------------------------------------------------------
     # Ver que se hayan cerrado los procesos
+    # Ver que se hayan cerrado los procesos
 
     time.sleep(1)
     if h1.waiting:
-        print "h1 no salio"
+        print "Proceso de h1 no salio"
     if h2.waiting:
-        print "h2 no salio"
+        print "Proceso de h2 no salio"
     if not h1.waiting and not h2.waiting:
-        print "Todo bien"
+        print "Los procesos de h1 y h2 terminaron"
 
 if __name__ == '__main__':
     setLogLevel( 'info' )
