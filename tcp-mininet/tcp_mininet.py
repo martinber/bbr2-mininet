@@ -121,34 +121,35 @@ def myNetwork():
     pid_tcpdump = h1.bgCmd("tcpdump -i h1-eth0 -w ./trace.pcap")
     h1.cmd("mkdir ./captcp_ss")
     pid_captcp_ss = h1.bgCmd("captcp socketstatistic -s 10 -o ./captcp_ss") # 10Hz
-    #popen_captcp_ss = h1.popen("captcp socketstatistic -s 10 -o ./captcp_ss &") # 10Hz
-    #h1.sendCmd("captcp socketstatistic -s 10 -o ./captcp_ss &") # 10Hz
-    #popen_captcp_ss = h1.popen("pwd") # 10Hz
     h1.cmdPrint("iperf -c 10.0.0.2")
-    #popen_iperf = h1.popen("iperf -c 10.0.0.2")
-    #time.sleep(3)
 
     time.sleep(1)
+    
     print "Parando tcpdump"
     h1.killPid(pid_tcpdump)
-    time.sleep(1)
     print "Parando captcp"
     h1.killPid(pid_captcp_ss)
-    time.sleep(10)
-    #popen_captcp_ss.send_signal(signal.SIGINT)
-    #h1.sendInt(chr(signal.SIGINT))
-    #print h1.waitOutput()
+    time.sleep(2)
     print "Parando iperf"
     h2.killPid(pid_iperf)
-    #salida = pmonitor({"a": popen_captcp_ss}, timeoutms=500)
-    #for h, l in salida:
-    #    print "ASD"
-    #    print l
 
     print "Graficando socketstatistic"
     
-    h1.cmd("pushd ./captcp_ss")
-    h1.cmd("make")
+    h1.cmd("pushd ./captcp_ss/*:5001")
+    
+    h1.cmd("pushd ./cwnd-ssthresh")
+    h1.cmdPrint("pwd")
+    h1.cmdPrint("make")
+    h1.cmd("popd")
+    
+    h1.cmd("pushd ./rtt")
+    h1.cmdPrint("make")
+    h1.cmd("popd")
+    
+    h1.cmd("pushd ./skmem")
+    h1.cmdPrint("make")
+    h1.cmd("popd")
+    
     h1.cmd("popd")
     
     print "Determinando el numero de flow capturado"
