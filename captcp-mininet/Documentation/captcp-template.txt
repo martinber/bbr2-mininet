@@ -1,0 +1,16 @@
+Template Module
+---------------
+
+Synopsis
+~~~~~~~~
+[verse]
+'captcp' template
+	[--verbose <debug | info | error >] [--list] <templatename>
+
+Description
+~~~~~~~~~~~
+
+Provides useful Gnuplot and Makefile templates for visualization. Also used
+internal.
+
+

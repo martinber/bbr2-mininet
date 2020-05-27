@@ -1,0 +1,62 @@
+Stacktrace Module
+-----------------
+
+
+Synopsis
+~~~~~~~~
+[verse]
+'captcp' stacktrace
+	--output-dir <dir> [--init]
+	[--verbose <debug | info | warning | error >]
+
+Description
+~~~~~~~~~~~
+Record Linux Network stack internal variables for analysis. Per
+default the initial congestion window as well as the slow start threshold
+(ssthresh) are recorded.
+
+Note that root capabilities are required to run this analysis. If the script
+is not started as root then the script try to spawn systemtap via
+captcplink:sudo[1]. So you can edit /etc/sudoers via visudo to execute
+systemtap with increased permissions.
+
+image::images/cwnd.png[]
+
+Background
+~~~~~~~~~~
+
+This module use captcplink:systemap[1] in the background to collect internal
+Kernel data. So make sure you have installed systemtap and have a runnig
+systemtap environment. Please check this before you use this module.
+
+If an error is encountered then often ther Kernelsource differs from the
+actual running Kernelversion.
+
+Options
+~~~~~~~
+
+-o::
+--output-dir::
+				Specify the outpur directory where all files are generated. This
+				can be "." - the actual directory. This option is required to make
+				sure that the amount of generated files do not fill the current
+				directory.
+
+-i::
+--init::
+				Generate template files for Gnuplot and Makefile. In other words:
+				without these option only the raw-data files are generated.
+				You are free to specify this option every time. But note that the
+				original file is overwriten each time - without any warning! Don't
+				use this option if the Gnuplot or/and Makefile is modified.
+
+Examples
+~~~~~~~~
+
+Take a stacktrace, interrupt the processing and generate PDF's.
+
+	$ captcp stacktrace --init --output-dir cwnd-test
+	^C
+	$ cd cwnd-test
+	$ make
+

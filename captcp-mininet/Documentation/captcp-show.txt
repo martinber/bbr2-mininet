@@ -1,0 +1,110 @@
+Show Module
+-----------
+
+
+Synopsis
+~~~~~~~~
+[verse]
+'captcp' show
+	[--(v)erbose <debug | info | warning | error>]
+	[--(d)ifferentiate <connection | flow>]
+	[--(m)atch <string>]
+	[--connection-(i)d <id>]
+	<pcapfile>
+
+
+Description
+~~~~~~~~~~~
+
+Display TCP flows like tcpdump with some features:
+
+- Highlighting (up to 256 colors for supporter terminals (rxvt-unicode-256color))
+- Different colors for connections or flows
+- Powerful matching capabilities
+
+image::images/show.png[]
+
+
+Options
+~~~~~~~
+
+-v::
+--verbose:: <debug | info | warning | error>
+
+				Show more output (default is warning)
+
+-d::
+--differentiate <connection | flow>
+				Highlight different connections or different flows. If several
+				connections are captured then the connection options provide a quick
+				way to see how many connections are captured and when. If one flow is
+				captured then this is a method to see TX and RX directions of the
+				flow.
+
+-m::
+--match:: <filter>
+				Used to highlight only packets there the provided filter evaluate to
+				true. Filter can be:
+
+-s::
+--suppress::
+				Only usefull in combination with match. Instead of coloring packets
+				red (which is the default), only matched packets are displayed. All
+				other packets are not displayed.
+
+-n::
+--number::
+				Show in firt row the absolut packet number. This can be used to
+				correlate one packet with the packet in wireshark or tcpdump.
+
+
+Examples
+~~~~~~~~
+
+Highlight different flows
+
+	$ captcp show -d flow capture.pcap
+
+The next example and image illustrate the default options to differentiate
+connections.
+
+	$ captcp show capture.pcap
+
+image::images/show-connections.png[]
+
+
+Matching can be really powerfull. We start with the hello world example:
+
+	$ captcp.py show --match True trace.pcap
+
+This will match all packets, thus all packets are red colored.
+
+
+Another usefull option is --suppress: only packets are displayed where the
+match evalutated to true. This can be used to count special packets. As an
+example: to display only packets with TCP SACK (selective acknowledgements)
+you can filter for it and suppress all other packets
+
+	$ captcp.py show --match "sackblocks" --suppress trace.pcap
+
+Highlight packet where the TCP SYN and ACK flag is set:
+
+	$ captcp.py show --match "syn_flag and ack_flag" trace.pcap
+
+Show packets where the Maximum Segment Size is less then 1000:
+
+	$ captcp.py show --match "mss and mss < 1000" trace.pcap
+
+It is important to note that MSS must be checked before the values can be
+compared. A packet where no MSS is present (the MSS option is only set at the
+Three Way Handshake) the mss value is False. So a plain statement like "mss <
+1400" will evalulate to "False < 100" which is true in Python. Therefore the
+additional check is required.
+
+
+Show all packets with SACK blocks and where the first TCP SACK block
+(left-edge) starts with a number less then the acknowledgenumber. Normally
+this is not superfluous, but sometimes DUP-ACKs are cached and retransmitted
+and the SACK information is not updated.
+
+	$ captcp.py show -m "sackblocks and len(sackblocks) > 0 and sackblocks[0][0] < ack" --suppress --number trace2.pcap

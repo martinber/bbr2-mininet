@@ -8,11 +8,13 @@ from mininet.node import IVSSwitch
 from mininet.cli import CLI
 from mininet.log import setLogLevel, info
 from mininet.link import TCLink, Intf
+from mininet.util import pmonitor
 from subprocess import call
 
 import parse
 
 import time
+import signal
 
 class MiHost(Host):
     """
@@ -43,9 +45,9 @@ class MiHost(Host):
 
     def killPid(self, pid):
         """
-        Mata un proceso dado su PID.
+        Manda Ctrl-C a un proceso dado su PID.
         """
-        self.cmd("kill", pid)
+        self.cmdPrint("kill -INT {}".format(pid))
 
 def myNetwork():
 
@@ -116,22 +118,45 @@ def myNetwork():
     pid_iperf = h2.bgCmd("iperf -s")
     time.sleep(1)
 
-    pid_tcpdump = h1.cmdPrint("ip a")
     pid_tcpdump = h1.bgCmd("tcpdump -i h1-eth0 -w ./trace.pcap")
+    h1.cmd("mkdir ./captcp_ss")
+    pid_captcp_ss = h1.bgCmd("captcp socketstatistic -s 10 -o ./captcp_ss") # 10Hz
+    #popen_captcp_ss = h1.popen("captcp socketstatistic -s 10 -o ./captcp_ss &") # 10Hz
+    #h1.sendCmd("captcp socketstatistic -s 10 -o ./captcp_ss &") # 10Hz
+    #popen_captcp_ss = h1.popen("pwd") # 10Hz
     h1.cmdPrint("iperf -c 10.0.0.2")
+    #popen_iperf = h1.popen("iperf -c 10.0.0.2")
+    #time.sleep(3)
 
+    time.sleep(1)
+    print "Parando tcpdump"
     h1.killPid(pid_tcpdump)
+    time.sleep(1)
+    print "Parando captcp"
+    h1.killPid(pid_captcp_ss)
+    time.sleep(10)
+    #popen_captcp_ss.send_signal(signal.SIGINT)
+    #h1.sendInt(chr(signal.SIGINT))
+    #print h1.waitOutput()
+    print "Parando iperf"
     h2.killPid(pid_iperf)
+    #salida = pmonitor({"a": popen_captcp_ss}, timeoutms=500)
+    #for h, l in salida:
+    #    print "ASD"
+    #    print l
 
-    h1.cmdPrint("pwd")
-    h2.cmdPrint("pwd")
+    print "Graficando socketstatistic"
     
-    # Determinar el numero de flow capturado
+    h1.cmd("pushd ./captcp_ss")
+    h1.cmd("make")
+    h1.cmd("popd")
+    
+    print "Determinando el numero de flow capturado"
 
     salida = h1.cmd("captcp statistic ./trace.pcap | grep -E 'Flow|Data application layer' | ansi2txt")
     flow = parse.parse_captcp_stat(salida)
     
-    # Graficar throughput
+    print "Graficando throughput"
 
     h1.cmd('mkdir -p "./captcp_throughput"')
     h1.cmd(
@@ -147,7 +172,7 @@ def myNetwork():
     h1.cmd("make")
     h1.cmd("popd")
     
-    # Graficar inflight
+    print "Graficar inflight"
 
     h1.cmd('mkdir -p "./captcp_inflight"')
     h1.cmd(
@@ -161,10 +186,7 @@ def myNetwork():
     h1.cmd("make")
     h1.cmd("popd")
 
-
-
     # --------------------------------------------------------------------------
-    # Ver que se hayan cerrado los procesos
     # Ver que se hayan cerrado los procesos
 
     time.sleep(1)

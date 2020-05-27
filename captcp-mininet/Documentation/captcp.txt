@@ -1,0 +1,71 @@
+Captcp
+======
+
+About
+-----
+
+Since several years I used to use a own repository of scripts to analyze
+network traffic. First I started with plain tcpdump, tcptrace, tcpslice,
+tcpstat and the other tools. After some years I started to wrote an own set of
+scripts, starting with Perl and later also some Ruby scripts. Before I forget,
+of course, a few C programs are also in the collection. Captcp is the attempt
+to rewrite the scripts in Python.
+
+This documentation is also avaiable in PDF form: link:captcp.pdf[PDF file]
+
+
+Some Words About Packet Analysis
+--------------------------------
+
+During the years some wisdoms are here collected. You can ignore them, sure,
+but eventually there are some tricks for you.
+
+* Don't capture data life - capture the data via tcpdump and analyze the data off-line
+* If you know what you want to analyze you can adjust tcpdump to capture the required data
+* Make backups of your traces
+* Don't use one tool, find the most useful tool for your requirements
+* Last but not least: question the results!
+
+
+image::images/seq.png[]
+
+Modulse Overview
+----------------
+
+The script functionality is splitted into submodules. Similar to git, perf and
+kvm-tool. The following list provides an overview over the currently supported
+list. If in doubt you can call captcp without any argument to get the full
+list.
+
+- Stacktrace
+- Show
+- Statistic
+- Payloadtimeport
+- Timesequence
+- Geoip
+- Throughtput
+- Connection
+- Template
+- Sequencegraph
+
+General Synopsis
+----------------
+
+[verse]
+'captcp' [--help] MODULENAME [ARGS]
+
+
+
+include::captcp-statistic.txt[tabsize=3]
+include::captcp-stacktrace.txt[tabsize=3]
+include::captcp-sequencegraph.txt[tabsize=3]
+include::captcp-show.txt[tabsize=3]
+include::captcp-throughput.txt[tabsize=3]
+include::captcp-time-sequence-graph.txt[tabsize=3]
+include::captcp-template.txt[tabsize=3]
+include::emulation.txt[tabsize=3]
+
+
+See also
+--------
+linkcaptcp:captcp-stacktrace[1], linkcaptcp:captcp-timesequence[1]

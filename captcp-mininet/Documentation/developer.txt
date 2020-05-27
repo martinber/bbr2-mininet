@@ -1,0 +1,30 @@
+
+Connection:
+
+    Bidirectional TCP flow between two peers. A connection consist of at least one
+    flow, but for 99% it consist of two flows: the data flow from the sender to
+    the receiver and a ACK flow from the receiver back to the sender of data. It
+    can happend that only on flow exist: three way handshake and the receiver is
+    not available (dropped packets at firewall) or if the capture file only
+    consist of one part.
+
+Flow:
+    a unidirectional flow from one the sender to the receiver.
+
+
+To check for an specific Flow ID:
+
+packet.flow_id()
+
+packet.connection_id()
+
+packet.srcip
+packet.dstip
+packet.family == AF_INET || AF_INET6
+packet.srcport
+
+packet.options.window_scale
+packet.options.sackok
+packet.options.sackblock[0]
+
+
