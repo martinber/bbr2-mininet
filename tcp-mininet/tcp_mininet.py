@@ -40,9 +40,17 @@ class MiHost(Host):
         Corre un comando en el fondo y devuelve su PID.
         """
         cmd = cmd + ("&",)
-        print(self.cmd(*cmd))
+        self.cmd(*cmd)
         return int(self.cmd("echo $!"))
-
+        
+    def logCmd(self, log_file, *cmd):
+        """
+        Corre un comando y guarda la salida en el archivo de log
+        """
+        log_file.write("Host: {} ----------------------------\n".format(self.name))
+        log_file.write(str(cmd) + "\n")
+        log_file.write(str(self.cmd(*cmd)) + "\n")
+        
     def killPid(self, pid):
         """
         Manda Ctrl-C a un proceso dado su PID.
@@ -78,7 +86,11 @@ def run_test(test):
     # Inicializar
 
     h1.cmd("modprobe tcp_bbr")
-    h2.cmd("modprobe tcp_bbr2")
+    h2.cmd("modprobe tcp_bbr")
+
+    h1.cmd("sysctl -w net.ipv4.tcp_congestion_control={}".format(test.tcp_cc))
+    h2.cmd("sysctl -w net.ipv4.tcp_congestion_control={}".format(test.tcp_cc))
+
 
     # --------------------------------------------------------------------------
     # Crear carpetas temporales y moverse ahi
@@ -99,6 +111,9 @@ def run_test(test):
 
         log_file.write(str(test) + "\n")
         log_file.write("------------------------------\n")
+        
+        h1.logCmd(log_file, "sysctl net.ipv4.tcp_congestion_control")
+        h2.logCmd(log_file, "sysctl net.ipv4.tcp_congestion_control")
 
         # --------------------------------------------------------------------------
         # Servidor HTTP
@@ -128,7 +143,7 @@ def run_test(test):
         pid_tcpdump = h1.bgCmd("tcpdump -s 96 -i h1-eth0 -w ./trace.pcap")
         h1.cmd("mkdir ./captcp_ss")
         pid_captcp_ss = h1.bgCmd("captcp socketstatistic -s 50 -o ./captcp_ss") # 10Hz
-        h1.cmdPrint("iperf -c 10.0.0.2 -t 20")
+        h1.cmdPrint("iperf -c 10.0.0.2 -t 2")
 
         time.sleep(1)
         
@@ -249,9 +264,18 @@ class TestDef:
             "delay": "{}ms".format(self.delay),
             "max_queue_size": self.max_queue_size,
         }
+        
+    def __str__(self):
+        """
+        Se imprime a si mismo para loguearse
+        """
+        return self.name
 
 if __name__ == '__main__':
     setLogLevel( 'info' )
+    
+    shutil.rmtree("/var/tmp/mininet", ignore_errors=True)
+    
     
     
     tests = [
@@ -262,14 +286,14 @@ if __name__ == '__main__':
             max_queue_size=100,
         ),
         TestDef(
-            tcp_cc="reno",
-            bw=100000,
+            tcp_cc="bbr",
+            bw=10000,
             delay=100,
             max_queue_size=100,
         ),
         TestDef(
-            tcp_cc="reno",
-            bw=1000000,
+            tcp_cc="bbr2",
+            bw=10000,
             delay=100,
             max_queue_size=100,
         ),
