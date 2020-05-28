@@ -15,6 +15,7 @@ import parse
 
 import time
 import signal
+import shutil
 
 class MiHost(Host):
     """
@@ -143,7 +144,7 @@ def run_test(test):
         pid_tcpdump = h1.bgCmd("tcpdump -s 96 -i h1-eth0 -w ./trace.pcap")
         h1.cmd("mkdir ./captcp_ss")
         pid_captcp_ss = h1.bgCmd("captcp socketstatistic -s 50 -o ./captcp_ss") # 10Hz
-        h1.cmdPrint("iperf -c 10.0.0.2 -t 2")
+        h1.logCmd(log_file, "iperf -c 10.0.0.2 -t 2")
 
         time.sleep(1)
         
@@ -160,16 +161,15 @@ def run_test(test):
         h1.cmd("pushd ./captcp_ss/*:5001")
         
         h1.cmd("pushd ./cwnd-ssthresh")
-        h1.cmdPrint("pwd")
-        h1.cmdPrint("make")
+        h1.logCmd(log_file, "make")
         h1.cmd("popd")
         
         h1.cmd("pushd ./rtt")
-        h1.cmdPrint("make")
+        h1.logCmd(log_file, "make")
         h1.cmd("popd")
         
         h1.cmd("pushd ./skmem")
-        h1.cmdPrint("make")
+        h1.logCmd(log_file, "make")
         h1.cmd("popd")
         
         h1.cmd("popd")
@@ -275,7 +275,6 @@ if __name__ == '__main__':
     setLogLevel( 'info' )
     
     shutil.rmtree("/var/tmp/mininet", ignore_errors=True)
-    
     
     
     tests = [

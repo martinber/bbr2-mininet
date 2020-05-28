@@ -5590,7 +5590,7 @@ class SocketStatisticsMod(Mod):
                 d["SK_MEMINFO_OPTMEM"] = date[1:]
                 continue
 
-            self.logger.warning("Unknown socket buffer value: %s" % (date))
+            # self.logger.warning("Unknown socket buffer value: %s" % (date))
 
         if int(d["SK_MEMINFO_FWD_ALLOC"]) >= 4294966736:
             self.logger.warning("SK_MEMINFO_FWD_ALLOC >= 4294966736 - reduce to 0")
