@@ -231,6 +231,7 @@ class TestDef:
         tcp_cc, # Congestion control: reno, cubic, bbr, bbr2
         bw, # Ancho de banda de enlaces en Mbitps
         delay, # Delay de enlaces en ms, el RTT deberia ser el doble
+        loss, # Perdida en porcentaje (1 = 1%), o None
         max_queue_size, # Tamano de cola de cada enlace
     ):
         TestDef.total_tests += 1
@@ -241,13 +242,15 @@ class TestDef:
         self.tcp_cc = tcp_cc
         self.bw = bw
         self.delay = delay
+        self.loss = loss
         self.max_queue_size = max_queue_size
         
         # Nombre unico, pensado para usarse como nombre de archivo
-        self.name = "{tcp_cc}_{bw}mbps_{delay}ms_{queue}pkt".format(
+        self.name = "{tcp_cc}_{bw}mbps_{delay}ms_{loss}%_{queue}pkt".format(
             tcp_cc=tcp_cc,
             bw=bw,
             delay=delay,
+            loss=loss,
             queue=max_queue_size,
         )
         
@@ -262,6 +265,7 @@ class TestDef:
         return {
             "bw": self.bw,
             "delay": "{}ms".format(self.delay),
+            "loss": self.loss,
             "max_queue_size": self.max_queue_size,
         }
         
@@ -276,36 +280,40 @@ if __name__ == '__main__':
     
     shutil.rmtree("/var/tmp/mininet", ignore_errors=True)
     
-    
     tests = [
         TestDef(
             tcp_cc="reno",
-            bw=1,
+            bw=100,
             delay=1,
-            max_queue_size=100,
-        ),
-        TestDef(
-            tcp_cc="reno",
-            bw=10,
-            delay=1,
+            loss=None,
             max_queue_size=100,
         ),
         TestDef(
             tcp_cc="reno",
             bw=100,
             delay=1,
+            loss=1,
             max_queue_size=100,
         ),
         TestDef(
             tcp_cc="reno",
-            bw=1000,
+            bw=100,
             delay=1,
+            loss=2,
             max_queue_size=100,
         ),
         TestDef(
             tcp_cc="reno",
-            bw=10000,
+            bw=100,
             delay=1,
+            loss=10,
+            max_queue_size=100,
+        ),
+        TestDef(
+            tcp_cc="reno",
+            bw=100,
+            delay=1,
+            loss=40,
             max_queue_size=100,
         ),
     ]
