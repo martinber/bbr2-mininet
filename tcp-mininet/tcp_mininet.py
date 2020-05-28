@@ -228,11 +228,12 @@ class TestDef:
     
     def __init__(
         self,
-        tcp_cc, # Congestion control: reno, cubic, bbr, bbr2
-        bw, # Ancho de banda de enlaces en Mbitps
-        delay, # Delay de enlaces en ms, el RTT deberia ser el doble
-        loss, # Perdida en porcentaje (1 = 1%), o None
-        max_queue_size, # Tamano de cola de cada enlace
+        tcp_cc="reno", # Congestion control: reno, cubic, bbr, bbr2
+        bw=100, # Ancho de banda de enlaces en Mbitps
+        delay=0, # Delay de enlaces en ms, el RTT deberia ser el doble
+        jitter=0, # Jitter en ms
+        loss=None, # Perdida en porcentaje (1 = 1%), o None
+        max_queue_size=None, # Tamano de cola de cada enlace. vendria a ser el limit de netem
     ):
         TestDef.total_tests += 1
         
@@ -242,14 +243,16 @@ class TestDef:
         self.tcp_cc = tcp_cc
         self.bw = bw
         self.delay = delay
+        self.jitter = jitter
         self.loss = loss
         self.max_queue_size = max_queue_size
         
         # Nombre unico, pensado para usarse como nombre de archivo
-        self.name = "{tcp_cc}_{bw}mbps_{delay}ms_{loss}%_{queue}pkt".format(
+        self.name = "{tcp_cc}_{bw}mbps_{delay}~{jitter}ms_{loss}%_{queue}pkt".format(
             tcp_cc=tcp_cc,
             bw=bw,
             delay=delay,
+            jitter=jitter,
             loss=loss,
             queue=max_queue_size,
         )
@@ -265,6 +268,7 @@ class TestDef:
         return {
             "bw": self.bw,
             "delay": "{}ms".format(self.delay),
+            "jitter": "{}ms".format(self.jitter),
             "loss": self.loss,
             "max_queue_size": self.max_queue_size,
         }
@@ -285,6 +289,7 @@ if __name__ == '__main__':
             tcp_cc="reno",
             bw=100,
             delay=1,
+            jitter=0,
             loss=None,
             max_queue_size=100,
         ),
@@ -292,30 +297,19 @@ if __name__ == '__main__':
             tcp_cc="reno",
             bw=100,
             delay=1,
-            loss=1,
+            jitter=10,
+            loss=None,
             max_queue_size=100,
         ),
         TestDef(
             tcp_cc="reno",
             bw=100,
             delay=1,
-            loss=2,
+            jitter=100,
+            loss=None,
             max_queue_size=100,
         ),
-        TestDef(
-            tcp_cc="reno",
-            bw=100,
-            delay=1,
-            loss=10,
-            max_queue_size=100,
-        ),
-        TestDef(
-            tcp_cc="reno",
-            bw=100,
-            delay=1,
-            loss=40,
-            max_queue_size=100,
-        ),
+
     ]
     
     for t in tests:
