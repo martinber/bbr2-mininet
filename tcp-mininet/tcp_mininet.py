@@ -144,7 +144,7 @@ def run_test(test):
         pid_tcpdump = h1.bgCmd("tcpdump -s 96 -i h1-eth0 -w ./trace.pcap")
         h1.cmd("mkdir ./captcp_ss")
         pid_captcp_ss = h1.bgCmd("captcp socketstatistic -s 50 -o ./captcp_ss") # 10Hz
-        h1.logCmd(log_file, "iperf -c 10.0.0.2 -t 2")
+        h1.logCmd(log_file, "iperf -c 10.0.0.2 -t 20")
 
         time.sleep(1)
         
@@ -229,7 +229,7 @@ class TestDef:
     def __init__(
         self,
         tcp_cc, # Congestion control: reno, cubic, bbr, bbr2
-        bw, # Ancho de banda de enlaces en kbps?
+        bw, # Ancho de banda de enlaces en Mbitps
         delay, # Delay de enlaces en ms, el RTT deberia ser el doble
         max_queue_size, # Tamano de cola de cada enlace
     ):
@@ -244,7 +244,7 @@ class TestDef:
         self.max_queue_size = max_queue_size
         
         # Nombre unico, pensado para usarse como nombre de archivo
-        self.name = "{tcp_cc}_{bw}k_{delay}ms_{queue}pkt".format(
+        self.name = "{tcp_cc}_{bw}mbps_{delay}ms_{queue}pkt".format(
             tcp_cc=tcp_cc,
             bw=bw,
             delay=delay,
@@ -280,20 +280,32 @@ if __name__ == '__main__':
     tests = [
         TestDef(
             tcp_cc="reno",
-            bw=10000,
-            delay=100,
+            bw=1,
+            delay=1,
             max_queue_size=100,
         ),
         TestDef(
-            tcp_cc="bbr",
-            bw=10000,
-            delay=100,
+            tcp_cc="reno",
+            bw=10,
+            delay=1,
             max_queue_size=100,
         ),
         TestDef(
-            tcp_cc="bbr2",
+            tcp_cc="reno",
+            bw=100,
+            delay=1,
+            max_queue_size=100,
+        ),
+        TestDef(
+            tcp_cc="reno",
+            bw=1000,
+            delay=1,
+            max_queue_size=100,
+        ),
+        TestDef(
+            tcp_cc="reno",
             bw=10000,
-            delay=100,
+            delay=1,
             max_queue_size=100,
         ),
     ]
