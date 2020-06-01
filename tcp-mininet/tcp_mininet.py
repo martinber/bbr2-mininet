@@ -141,7 +141,7 @@ def run_test(test):
         pid_iperf = h2.bgCmd("iperf -s")
         time.sleep(1)
 
-        pid_tcpdump = h1.bgCmd("tcpdump -s 96 -i h1-eth0 -w ./trace.pcap")
+        pid_tcpdump = h1.bgCmd("tcpdump -i h1-eth0 -w ./trace.pcap")
         h1.cmd("mkdir ./captcp_ss")
         pid_captcp_ss = h1.bgCmd("captcp socketstatistic -s 50 -o ./captcp_ss") # 10Hz
         h1.logCmd(log_file, "iperf -c 10.0.0.2 -t 20")
@@ -183,7 +183,7 @@ def run_test(test):
 
         h1.cmd('mkdir -p "./captcp_throughput"')
         h1.cmd(
-            "captcp throughput -s {sample_len} -i -u Mbit \
+            "captcp throughput -ps {sample_len} -i -u Mbit \
             -f {flow} -o {output_dir} {pcap}".format(
                 sample_len="0.1",
                 flow=flow,
@@ -208,6 +208,8 @@ def run_test(test):
         h1.cmd("pushd ./captcp_inflight")
         h1.cmd("make")
         h1.cmd("popd")
+        
+        h1.cmd("rm ./trace.pcap")
 
         # --------------------------------------------------------------------------
         # Ver que se hayan cerrado los procesos
@@ -233,7 +235,8 @@ class TestDef:
         delay=0, # Delay de enlaces en ms, el RTT deberia ser el doble
         jitter=0, # Jitter en ms
         loss=None, # Perdida en porcentaje (1 = 1%), o None
-        max_queue_size=None, # Tamano de cola de cada enlace. vendria a ser el limit de netem
+        max_queue_size=None, # Tamano de cola en paquetes de cada enlace.
+                             # Vendria a ser el limit de netem
     ):
         TestDef.total_tests += 1
         
@@ -287,29 +290,36 @@ if __name__ == '__main__':
     tests = [
         TestDef(
             tcp_cc="reno",
-            bw=100,
-            delay=1,
-            jitter=0,
-            loss=None,
-            max_queue_size=100,
+            bw=10, # Mbps
+            delay=100, # ms
+            jitter=0, # ms
+            loss=None, # %
+            max_queue_size=None, # paquetes
         ),
         TestDef(
             tcp_cc="reno",
-            bw=100,
-            delay=1,
-            jitter=10,
-            loss=None,
-            max_queue_size=100,
+            bw=10, # Mbps
+            delay=100, # ms
+            jitter=0, # ms
+            loss=None, # %
+            max_queue_size=10, # paquetes
         ),
         TestDef(
             tcp_cc="reno",
-            bw=100,
-            delay=1,
-            jitter=100,
-            loss=None,
-            max_queue_size=100,
+            bw=10, # Mbps
+            delay=100, # ms
+            jitter=0, # ms
+            loss=None, # %
+            max_queue_size=100, # paquetes
         ),
-
+        TestDef(
+            tcp_cc="reno",
+            bw=10, # Mbps
+            delay=100, # ms
+            jitter=0, # ms
+            loss=None, # %
+            max_queue_size=1000, # paquetes
+        ),
     ]
     
     for t in tests:
