@@ -64,24 +64,38 @@ def run_test(test):
     # Crear topologia
     
     net = Mininet(topo=None,
-                  build=False,
-                  ipBase='10.0.0.0/8')
+                  build=False)
 
     info( '*** Iniciando\n')
-    s1 = net.addSwitch('s1', cls=OVSKernelSwitch, failMode='standalone')
 
-    h1 = net.addHost('h1', cls=MiHost, ip='10.0.0.1', defaultRoute=None)
-    h2 = net.addHost('h2', cls=MiHost, ip='10.0.0.2', defaultRoute=None)
+    netem = net.addHost('netem', cls=MiHost, defaultRoute=None)
 
-    net.addLink(h1, s1, cls=TCLink, **test.get_link_params())
-    net.addLink(h2, s1, cls=TCLink, **test.get_link_params())
+    h1 = net.addHost('h1', cls=MiHost, ip='10.0.0.10/8', defaultRoute='10.0.0.1')
+    h2 = net.addHost('h2', cls=MiHost, ip='11.0.0.10/8', defaultRoute='11.0.0.1')
 
+    netem_int1 = net.addLink(h1, netem).intf2
+    netem_int2 = net.addLink(h2, netem).intf2
+    
     net.build()
+    net.start()
+
+    time.sleep(1)
+    
+    netem_int1.setIP("10.0.0.1/8")
+    netem_int2.setIP("11.0.0.1/8")
+    
+    h1.cmd("ip r add default via 10.0.0.1")
+    h2.cmd("ip r add default via 11.0.0.1")
+
+    netem.cmd("echo 1 > /proc/sys/net/ipv4/ip_forward")
+    netem.cmdPrint("ip -c a")
+    h1.cmdPrint("ip -c a")
+    h2.cmdPrint("ip -c a")
+
+    net.pingAll()
 
     for controller in net.controllers:
         controller.start()
-
-    net.get('s1').start([])
 
     # --------------------------------------------------------------------------
     # Inicializar
@@ -144,7 +158,7 @@ def run_test(test):
         pid_tcpdump = h1.bgCmd("tcpdump -i h1-eth0 -w ./trace.pcap")
         h1.cmd("mkdir ./captcp_ss")
         pid_captcp_ss = h1.bgCmd("captcp socketstatistic -s 50 -o ./captcp_ss") # 10Hz
-        h1.logCmd(log_file, "iperf -c 10.0.0.2 -t 20")
+        h1.logCmd(log_file, "iperf -c 11.0.0.10 -t 20")
 
         time.sleep(1)
         
@@ -296,30 +310,7 @@ if __name__ == '__main__':
             loss=None, # %
             max_queue_size=None, # paquetes
         ),
-        TestDef(
-            tcp_cc="reno",
-            bw=10, # Mbps
-            delay=100, # ms
-            jitter=0, # ms
-            loss=None, # %
-            max_queue_size=10, # paquetes
-        ),
-        TestDef(
-            tcp_cc="reno",
-            bw=10, # Mbps
-            delay=100, # ms
-            jitter=0, # ms
-            loss=None, # %
-            max_queue_size=100, # paquetes
-        ),
-        TestDef(
-            tcp_cc="reno",
-            bw=10, # Mbps
-            delay=100, # ms
-            jitter=0, # ms
-            loss=None, # %
-            max_queue_size=1000, # paquetes
-        ),
+        
     ]
     
     for t in tests:
