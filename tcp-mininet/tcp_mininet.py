@@ -106,6 +106,26 @@ def run_test(test):
     h1.cmd("sysctl -w net.ipv4.tcp_congestion_control={}".format(test.tcp_cc))
     h2.cmd("sysctl -w net.ipv4.tcp_congestion_control={}".format(test.tcp_cc))
 
+    # Poner netem solo en la interfaz de ida
+    
+    intf = netem_int2.name
+    netem.cmd("tc qdisc del dev {intf} root".format(
+            intf=intf
+        ))
+    netem.cmdPrint(("tc qdisc add dev {intf} root handle 1: netem "
+               "delay {delay}ms {jitter}ms {corr}%").format(
+            intf=intf,
+            delay=test.delay,
+            jitter=test.jitter,
+            corr=test.corr,
+        ))
+    netem.cmdPrint(("tc qdisc add dev {intf} parent 1: handle 2: tbf "
+               "rate {bw}mbit burst {burst}kb latency {latency}ms").format(
+            intf=intf,
+            bw=test.bw,
+            burst=test.burst,
+            latency=test.latency,
+        ))
 
     # --------------------------------------------------------------------------
     # Crear carpetas temporales y moverse ahi
@@ -127,6 +147,7 @@ def run_test(test):
         log_file.write(str(test) + "\n")
         log_file.write("------------------------------\n")
         
+        netem.logCmd(log_file, "tc qdisc show")
         h1.logCmd(log_file, "sysctl net.ipv4.tcp_congestion_control")
         h2.logCmd(log_file, "sysctl net.ipv4.tcp_congestion_control")
 
@@ -246,11 +267,12 @@ class TestDef:
         self,
         tcp_cc="reno", # Congestion control: reno, cubic, bbr, bbr2
         bw=100, # Ancho de banda de enlaces en Mbitps
+        burst=32, # Tamano del burs en kbytes, ver manual de tbf
+        latency=50, # Maximo delay del buffer en ms
         delay=0, # Delay de enlaces en ms, el RTT deberia ser el doble
         jitter=0, # Jitter en ms
-        loss=None, # Perdida en porcentaje (1 = 1%), o None
-        max_queue_size=None, # Tamano de cola en paquetes de cada enlace.
-                             # Vendria a ser el limit de netem
+        corr=25, # Correlacin del jitter en porcentaje (1 = 1%)
+        loss=0, # Perdida en porcentaje (1 = 1%)
     ):
         TestDef.total_tests += 1
         
@@ -259,36 +281,29 @@ class TestDef:
         
         self.tcp_cc = tcp_cc
         self.bw = bw
+        self.burst = burst
+        self.latency = latency
         self.delay = delay
         self.jitter = jitter
+        self.corr = corr
         self.loss = loss
-        self.max_queue_size = max_queue_size
         
         # Nombre unico, pensado para usarse como nombre de archivo
-        self.name = "{tcp_cc}_{bw}mbps_{delay}~{jitter}ms_{loss}%_{queue}pkt".format(
+        self.name = "{test_num}_{tcp_cc}_{bw}mbps_{delay}~{jitter}ms_{loss}%".format(
             tcp_cc=tcp_cc,
             bw=bw,
+            burst=burst,
+            latency=latency,
             delay=delay,
             jitter=jitter,
+            corr=corr,
             loss=loss,
-            queue=max_queue_size,
+            test_num=self.test_num,
         )
         
         self.folder = "/var/tmp/mininet/{}/".format(self.name)
         
         self.log_path = "{}/log.txt".format(self.folder)
-        
-    def get_link_params(self):
-        """
-        Devuelve parametros a usar en los links
-        """
-        return {
-            "bw": self.bw,
-            "delay": "{}ms".format(self.delay),
-            "jitter": "{}ms".format(self.jitter),
-            "loss": self.loss,
-            "max_queue_size": self.max_queue_size,
-        }
         
     def __str__(self):
         """
@@ -305,10 +320,12 @@ if __name__ == '__main__':
         TestDef(
             tcp_cc="reno",
             bw=10, # Mbps
+            burst=32, # kb
+            latency=50, # ms
             delay=100, # ms
             jitter=0, # ms
+            corr=25, # %
             loss=None, # %
-            max_queue_size=None, # paquetes
         ),
         
     ]
