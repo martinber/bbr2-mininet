@@ -146,6 +146,9 @@ def run_test(test):
 
     h2.cmd("mkdir -p {}/h2".format(test.folder))
     h2.cmd("cd {}/h2".format(test.folder))
+    
+    netem.cmd("mkdir -p {}/netem".format(test.folder))
+    netem.cmd("cd {}/netem".format(test.folder))
 
     h1.cmd("mkdir -p ~/resultados/")
     
@@ -189,6 +192,7 @@ def run_test(test):
         pid_tcpdump = h1.bgCmd("tcpdump -i h1-eth0 -w ./trace.pcap")
         h1.cmd("mkdir ./captcp_ss")
         pid_captcp_ss = h1.bgCmd("captcp socketstatistic -s 100 -o ./captcp_ss") # 100Hz
+        pid_qlen = netem.bgCmd("qlen_plot.py {}".format(intf))
         h1.logCmd(log_file, "iperf -c 11.0.0.10 -t {}".format(test.duration))
 
         time.sleep(1)
@@ -200,6 +204,8 @@ def run_test(test):
         time.sleep(2)
         print "Parando iperf"
         h2.killPid(pid_iperf)
+        print "Parando qlen_plot"
+        netem.killPid(pid_qlen)
 
         print "Graficando socketstatistic"
         
@@ -412,6 +418,7 @@ def prueba_3():
             tcp_ccs, bws, latencies, delays, jitters, corrs, losses):
         
         BDP = int(bw*100000000 * delay/1000) # bits/s * segundos
+        # Creo que esta mal y sobran dos ceros
         
         tests.append(TestDef(
             tcp_cc=tcp_cc,
@@ -428,10 +435,40 @@ def prueba_3():
     for t in tests:
         run_test(t)
 
+def prueba_4():
+    
+    tests = []
+    
+    tcp_ccs = ["reno", "bbr2"]
+    bws = [10] # Mbps
+    latencies = [70] # ms
+    delays = [30] # ms
+    jitters = [0] # ms
+    corrs = [25] # %
+    losses = [0] # %
+    
+    for tcp_cc, bw, latency, delay, jitter, corr, loss in itertools.product(
+            tcp_ccs, bws, latencies, delays, jitters, corrs, losses):
+                
+        tests.append(TestDef(
+            tcp_cc=tcp_cc,
+            bw=bw, # Mbps
+            burst=int(bw*1000/250), # kb, https://unix.stackexchange.com/a/100797
+            latency=latency, # ms
+            delay=delay, # ms
+            jitter=jitter, # ms
+            corr=corr, # %
+            loss=loss, # %
+            duration=20 # s
+        ))
+    
+    for t in tests:
+        run_test(t)
+
 if __name__ == '__main__':
     setLogLevel( 'info' )
     
     shutil.rmtree("/var/tmp/mininet", ignore_errors=True)
     
-    prueba_3()
+    prueba_4()
 
