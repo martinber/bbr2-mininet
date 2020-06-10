@@ -39,8 +39,6 @@ from subprocess import *
 import re
 import sys
 import signal
-
-import matplotlib.pyplot as plt
  
 def monitor_qlen(intf, interval_sec=0.01):
     # enp0s3qdisc fq_codel 0: root refcnt 2 limit 10240p flows 1024 quantum 1514 target 5.0ms interval 100.0ms memory_limit 32Mb ecn 
@@ -54,35 +52,28 @@ def monitor_qlen(intf, interval_sec=0.01):
     pat_queued = re.compile(r'backlog\s[^\s]+\s([\d]+)p')
     cmd = "tc -s qdisc show dev {}".format(intf)
     
-    t_values = []
-    y_values = []
+    last_t = None
 
     try:
-        with open("qlen.txt","w") as out_file:
+        with open("qlen.data","w") as out_file:
             out_file.write('')
             t0 = "%f" % time()
             while 1: 
                 p = Popen(cmd, shell=True, stdout=PIPE)
                 output = p.stdout.read().decode("utf-8")
                 matches = pat_queued.findall(output)
-                print(matches)
                 if matches and len(matches) > 1:
                     t1 = "%f" % time()
                     t = float(t1)-float(t0)
                     y = int(matches[1])
-                    t_values.append(t)
-                    y_values.append(y)
-                    print(t, y)
+                    
                     out_file.write(str(t)+' '+str(y)+'\n')
                     sleep(interval_sec)
     except KeyboardInterrupt:
-        print("Parado de monitorear") 
-    
-        fig = plt.figure()
-        ax = fig.subplots(1,1)
-        ax.plot(t_values, y_values)
-        fig.savefig("grafico.png")
-        print("Terminado")
+        if last_t:
+            print("Monitoreados {}s".format(last_t)) 
+        else:
+            print("No se grafico nada")
 
 if __name__ == "__main__":
 
