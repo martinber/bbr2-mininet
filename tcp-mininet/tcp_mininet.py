@@ -240,31 +240,7 @@ def run_test(test):
         print "Parando qlen_plot"
         netem.killPid(pid_qlen)
 
-        # Graficar socketstatistic
-
-        print "Graficando socketstatistic"
-
-        h1.cmdLog(log_file, (
-            "pushd ./captcp_ss/*:5001;"
-            
-            "pushd ./cwnd-ssthresh;"
-            "make;"
-            "mkdir -p {test.resfolder}/ssthreshs/;"
-            "cp *.pdf {test.resfolder}/ssthreshs/{test.name}.pdf;"
-            "popd;"
-
-            "pushd ./rtt;"
-            "make;"
-            "mkdir -p {test.resfolder}/rtts/;"
-            "cp *.pdf {test.resfolder}/rtts/{test.name}.pdf;"
-            "popd;"
-            
-            "pushd ./skmem;"
-            "make;"
-            "popd;"
-            "popd;").format(test=test))
-
-        # Graficar throughput
+        # Analizar throughput
 
         print "Determinando el numero de flow capturado"
 
@@ -272,29 +248,21 @@ def run_test(test):
             "captcp statistic ./trace.pcap | grep -E 'Flow|Data application layer' | ansi2txt")
         flow = parse.parse_captcp_stat(salida)
 
-        print "Graficando throughput"
+        print "Analizando throughput"
 
         h1.cmdLog(log_file, (
             'mkdir -p "./captcp_throughput";'
-            "captcp throughput -ps 0.1 -i -u Mbit -f {flow} -o ./captcp_throughput ./trace.pcap;"
-            "pushd ./captcp_throughput;"
-            "make;"
-            "mkdir -p {test.resfolder}/throughputs/;"
-            "cp *.pdf {test.resfolder}/throughputs/{test.name}.pdf;"
-            "popd;").format(test=test, flow=flow))
+            "captcp throughput -ps 0.1 -i -u Mbit -f {flow} -o ./captcp_throughput ./trace.pcap;")
+                .format(flow=flow))
 
-        # Graficar inflight
+        # Analizar inflight
 
-        print "Graficando inflight"
+        print "Analizando inflight"
 
         h1.cmdLog(log_file, (
             "mkdir -p ./captcp_inflight;"
-            "captcp inflight -i -f {flow} -o ./captcp_inflight ./trace.pcap;"
-            "pushd ./captcp_inflight;"
-            "make;"
-            "mkdir -p {test.resfolder}/inflights/;"
-            "cp *.pdf {test.resfolder}/inflights/{test.name}.pdf;"
-            "popd;").format(test=test, flow=flow))
+            "captcp inflight -i -f {flow} -o ./captcp_inflight ./trace.pcap;")
+                .format(flow=flow))
 
         h1.cmd(
             "rm ./trace.pcap")
@@ -376,7 +344,7 @@ class TestDef:
 
         self.folder = "/var/tmp/mininet/{}/".format(self.name)
 
-        self.resfolder = "/var/tmp/mininet/res/"
+        self.resfolder = "/var/tmp/mininet/results/"
 
         self.log_path = "{}/log.txt".format(self.folder)
 

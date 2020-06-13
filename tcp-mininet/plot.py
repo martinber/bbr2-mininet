@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+import os
+import errno
 
 def plot(name, data_paths, out_path):
     """
@@ -18,7 +20,12 @@ def plot(name, data_paths, out_path):
     
     out_path es la carpeta donde se guardan los graficos
     """
-
+    try:
+        os.makedirs(out_path)
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            pass
+    
     plots = [
         {
             "type": "qlen",
