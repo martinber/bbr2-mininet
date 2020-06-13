@@ -116,7 +116,7 @@ def run_test(test):
     netem.cmd("tc qdisc del dev {intf} root".format(intf=intf))
 
     if test.loss > 0:
-        loss = "loss {}% ".format(test.loss),
+        loss = "loss {}% ".format(test.loss)
     else:
         loss = ""
 
@@ -192,7 +192,8 @@ def run_test(test):
 
         # Iniciar servidor
         
-        pid_iperf = h2.bgCmd("iperf -s")
+        # El  /dev/null es para que no imprima nada en pantalla
+        pid_iperf = h2.bgCmd("iperf -s > /dev/null")
         time.sleep(1)
         
         # Iniciar capturas
@@ -328,7 +329,7 @@ class TestDef:
         self,
         tcp_cc="reno", # Congestion control: reno, cubic, bbr, bbr2
         bw=100, # Ancho de banda de enlaces en Mbitps
-        burst=32, # Tamano del burs en kbytes, ver manual de tbf
+        burst=32, # Tamano del burst en kbytes, ver manual de tbf
         latency=50, # Maximo delay del buffer en ms
         limit=None, # Tamano del buffer en bytes, es una alternativa a latency
         delay=0, # Delay de enlaces en ms, el RTT deberia ser el doble
@@ -384,100 +385,125 @@ def escenario_1():
     tests = []
     
     tcp_ccs = ["reno", "cubic", "bbr", "bbr2"]
-    bws = [10] # Mbps
-    bursts = [32] # kb
-    latencies = [50] # ms
-    delays = [100] # ms
-    jitters = [0] # ms
-    corrs = [25] # %
-    losses = [0] # %
     
     for tcp_cc in tcp_ccs:
         
         tests.append(TestDef(
             tcp_cc=tcp_cc,
             bw=10, # Mbps
-            burst=32, # kb
+            burst=32, # kbytes
             latency=50, # ms
             delay=100, # ms
             jitter=0, # ms
             corr=25, # %
             loss=0, # %
+            duration=20 # s
         ))
     
     for t in tests:
         run_test(t)
         
-def prueba_2():
+def escenario_2():
     
     tests = []
     
     tcp_ccs = ["bbr", "bbr2"]
-    bws = [100] # Mbps
-    latencies = [100] # ms
-    delays = [100] # ms
-    jitters = [0] # ms
-    corrs = [25] # %
-    losses = [0] # %
     
-    for tcp_cc, bw, latency, delay, jitter, corr, loss in itertools.product(
-            tcp_ccs, bws, latencies, delays, jitters, corrs, losses):
-        
+    for tcp_cc in tcp_ccs:
+        bw = 100
         tests.append(TestDef(
             tcp_cc=tcp_cc,
             bw=bw, # Mbps
-            burst=int(bw*1000/250), # kb, https://unix.stackexchange.com/a/100797
-            latency=latency, # ms
-            delay=delay, # ms
-            jitter=jitter, # ms
-            corr=corr, # %
-            loss=loss, # %
+            burst=int(bw*1000/250/8), # kbytes, https://unix.stackexchange.com/a/100797
+            latency=100, # ms
+            delay=100, # ms
+            jitter=0, # ms
+            corr=25, # %
+            loss=0, # %
+            duration=60 # s
+        ))
+    
+    for t in tests:
+        run_test(t)
+        
+def escenario_3():
+    
+    tests = []
+    
+    tcp_ccs = ["reno", "cubic", "bbr", "bbr2"]
+    
+    for tcp_cc in tcp_ccs:
+        bw = 100
+        tests.append(TestDef(
+            tcp_cc=tcp_cc,
+            bw=bw, # Mbps
+            burst=int(bw*1000/250/8), # kbytes, https://unix.stackexchange.com/a/100797
+            latency=100, # ms
+            delay=100, # ms
+            jitter=0, # ms
+            corr=25, # %
+            loss=0.5, # %
             duration=10 # s
         ))
     
     for t in tests:
         run_test(t)
         
-def prueba_3():
+def escenario_4():
+    
+    tests = []
+    
+    tcp_ccs = ["reno", "bbr", "bbr2"]
+    
+    for tcp_cc in tcp_ccs:
+        bw = 100
+        tests.append(TestDef(
+            tcp_cc=tcp_cc,
+            bw=bw, # Mbps
+            burst=int(bw*1000/250/8), # kbytes, https://unix.stackexchange.com/a/100797
+            latency=50, # ms
+            delay=50, # ms
+            jitter=0, # ms
+            corr=25, # %
+            loss=0, # %
+            duration=60 # s
+        ))
+    
+    for t in tests:
+        run_test(t)
+        
+def escenario_5():
+    
+    tests = []
+    
+    tcp_ccs = ["reno", "bbr", "bbr2"]
+    bw = 100
+    delay = 200
+    BDP = int(bw*1000000 * delay/1000)
+    
+    for tcp_cc in tcp_ccs:
+        tests.append(TestDef(
+            tcp_cc=tcp_cc,
+            bw=bw, # Mbps
+            burst=int(bw*1000/250/8), # kbytes, https://unix.stackexchange.com/a/100797
+            limit=int(BDP/100), # bytes
+            delay=50, # ms
+            jitter=0, # ms
+            corr=25, # %
+            loss=0, # %
+            duration=60 # s
+        ))
+    
+    for t in tests:
+        run_test(t)
+        
+def prueba():
     
     tests = []
     
     tcp_ccs = ["bbr", "bbr2"]
     bws = [100] # Mbps
-    latencies = [30, 60, 90] # ms
-    delays = [5, 30, 60, 90] # ms
-    jitters = [0] # ms
-    corrs = [25] # %
-    losses = [0] # %
-    
-    for tcp_cc, bw, latency, delay, jitter, corr, loss in itertools.product(
-            tcp_ccs, bws, latencies, delays, jitters, corrs, losses):
-        
-        BDP = int(bw*100000000 * delay/1000) # bits/s * segundos
-        # Creo que esta mal y sobran dos ceros
-        
-        tests.append(TestDef(
-            tcp_cc=tcp_cc,
-            bw=bw, # Mbps
-            burst=int(bw*1000/250), # kb, https://unix.stackexchange.com/a/100797
-            limit=int(10*BDP/8), # bytes
-            delay=delay, # ms
-            jitter=jitter, # ms
-            corr=corr, # %
-            loss=loss, # %
-            duration=3 # s
-        ))
-    
-    for t in tests:
-        run_test(t)
-
-def prueba_4():
-    
-    tests = []
-    
-    tcp_ccs = ["reno", "bbr2"]
-    bws = [10] # Mbps
-    latencies = [70] # ms
+    latencies = [30] # ms
     delays = [30] # ms
     jitters = [0] # ms
     corrs = [25] # %
@@ -485,17 +511,18 @@ def prueba_4():
     
     for tcp_cc, bw, latency, delay, jitter, corr, loss in itertools.product(
             tcp_ccs, bws, latencies, delays, jitters, corrs, losses):
-                
+        
+        BDP = bw*1000000 * delay/1000
         tests.append(TestDef(
             tcp_cc=tcp_cc,
             bw=bw, # Mbps
-            burst=int(bw*1000/250), # kb, https://unix.stackexchange.com/a/100797
+            burst=int(bw*1000/250/8), # kbytes, https://unix.stackexchange.com/a/100797
             latency=latency, # ms
             delay=delay, # ms
             jitter=jitter, # ms
             corr=corr, # %
             loss=loss, # %
-            duration=20 # s
+            duration=60 # s
         ))
     
     for t in tests:
@@ -506,5 +533,6 @@ if __name__ == '__main__':
     
     shutil.rmtree("/var/tmp/mininet", ignore_errors=True)
     
-    escenario_1()
+    escenario_3()
+    # TODO: Tomar desde argv
 

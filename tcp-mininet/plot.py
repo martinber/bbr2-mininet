@@ -70,5 +70,7 @@ def plot(name, data_paths, out_path):
             ax.plot(x_values, y_values)
             ax.set_xlabel(p["x_label"])
             ax.set_ylabel(p["y_label"])
+            
+            ax.set_ylim(0, ax.get_ylim()[1])
             fig.tight_layout()
             fig.savefig("{}/{}_{}.png".format(out_path, name, p["type"]))
