@@ -1,5 +1,14 @@
 #!/usr/bin/python
 
+import time
+import signal
+import os
+import shutil
+import itertools
+from glob import glob
+
+# Importar mininet
+
 from mininet.net import Mininet
 from mininet.node import Controller, RemoteController, OVSController
 from mininet.node import CPULimitedHost, Host, Node
@@ -11,26 +20,25 @@ from mininet.link import TCLink, Intf
 from mininet.util import pmonitor
 from subprocess import call
 
+# Importar modulos presentes en esta carpeta
+
 import parse
 from plot import plot
-
-import time
-import signal
-import shutil
-import itertools
-from glob import glob
 
 class MiHost(Host):
     """
     Host con algunas funciones mas.
 
-    Hay varias funciones para correr comandos. Ademas de las defidas en esta
-    clase, usamos:
+    Hay varias funciones para correr comandos, provenientes de Mininet y documentadas en
+    http://mininet.org/api/classmininet_1_1node_1_1Node.html.
+
+    Las mas utiles son:
 
     - self.cmd(): Correr un comando comun y esperar a que termine.
 
-    - self.cmdPrint(): Correr un comando mostrando la salida y esperar a que
-      termine.
+    - self.cmdPrint(): Correr un comando mostrando la salida y esperar a que termine.
+
+    En esta clase se definen mas funciones, ver abajo.
     """
 
     def __init__(self, *args, **kwargs):
@@ -39,176 +47,188 @@ class MiHost(Host):
     def config(self, **params):
         super(MiHost, self).config(**params)
 
-    def bgCmd(self, *cmd):
+    def cmdBack(self, *cmd):
         """
         Corre un comando en el fondo y devuelve su PID.
         """
         cmd = cmd + ("&",)
         self.cmd(*cmd)
         return int(self.cmd("echo $!"))
-        
-    def logCmd(self, log_file, *cmd):
+
+    def cmdLog(self, log_file, *cmd):
         """
-        Corre un comando y guarda la salida en el archivo de log
+        Corre un comando y guarda la salida en el archivo de log.
         """
         log_file.write("Host: {} ----------------------------\n".format(self.name))
         log_file.write(str(cmd) + "\n")
         log_file.write(str(self.cmd(*cmd)) + "\n")
-        
+
     def killPid(self, pid):
         """
         Manda Ctrl-C a un proceso dado su PID.
         """
-        self.cmdPrint("kill -INT {}".format(pid))
+        self.cmd("kill -INT {}".format(pid))
 
 def run_test(test):
+    """
+    Crear una topologia completa y correr una prueba.
 
-    # ------------------------------------------------------------------
-    # Crear topologia, configurar IPs, etc.
+    Se debe dar como argumento un obeto TestDef, que contiene los parametros de la prueba
+    """
     
-    net = Mininet(topo=None,
-                  build=False)
-
-    info( '*** Iniciando\n')
-
-    netem = net.addHost('netem', cls=MiHost, defaultRoute=None)
-
-    h1 = net.addHost('h1', cls=MiHost, ip='10.0.0.10/8', defaultRoute='10.0.0.1')
-    h2 = net.addHost('h2', cls=MiHost, ip='11.0.0.10/8', defaultRoute='11.0.0.1')
-
-    netem_int1 = net.addLink(h1, netem).intf2
-    netem_int2 = net.addLink(h2, netem).intf2
+    shutil.rmtree(test.folder, ignore_errors=True)
+    os.makedirs(test.folder)
     
-    net.build()
-    net.start()
-
-    time.sleep(1)
-    
-    netem_int1.setIP("10.0.0.1/8")
-    netem_int2.setIP("11.0.0.1/8")
-    
-    h1.cmd("ip r add default via 10.0.0.1")
-    h2.cmd("ip r add default via 11.0.0.1")
-
-    netem.cmd("echo 1 > /proc/sys/net/ipv4/ip_forward")
-    netem.cmdPrint("ip -c a")
-    h1.cmdPrint("ip -c a")
-    h2.cmdPrint("ip -c a")
-    
-    h1.cmd("modprobe tcp_bbr")
-    h2.cmd("modprobe tcp_bbr")
-
-    h1.cmd("sysctl -w net.ipv4.tcp_congestion_control={}".format(test.tcp_cc))
-    h2.cmd("sysctl -w net.ipv4.tcp_congestion_control={}".format(test.tcp_cc))
-
-    net.pingAll()
-
-    for controller in net.controllers:
-        controller.start()
-
-    # --------------------------------------------------------------------------
-    # Configurar netem
-
-    # Poner netem solo en la interfaz de ida
-
-    intf = netem_int2.name
-
-    netem.cmd("tc qdisc del dev {intf} root".format(intf=intf))
-
-    if test.loss > 0:
-        loss = "loss {}% ".format(test.loss)
-    else:
-        loss = ""
-
-    netem.cmdPrint(("tc qdisc add dev {intf} root handle 1: netem "
-                "{loss} delay {delay}ms {jitter}ms {corr}%").format(
-            intf=intf,
-            loss=loss,
-            delay=test.delay,
-            jitter=test.jitter,
-            corr=test.corr,
-        ))
-
-    if test.limit:
-        buf_params = "limit {}".format(test.limit)
-    else:
-        buf_params = "latency {}ms".format(test.latency)
-
-    netem.cmdPrint(("tc qdisc add dev {intf} parent 1: handle 2: tbf "
-               "rate {bw}mbit burst {burst}kb {buf_params}").format(
-            intf=intf,
-            bw=test.bw,
-            burst=test.burst,
-            buf_params=buf_params,
-        ))
-
-    # --------------------------------------------------------------------------
-    # Crear carpetas temporales y moverse ahi
-
-    h1.cmd("rm -r {}".format(test.folder))
-    h1.cmd("mkdir -p {}/h1".format(test.folder))
-    h1.cmd("cd {}/h1".format(test.folder))
-
-    h2.cmd("mkdir -p {}/h2".format(test.folder))
-    h2.cmd("cd {}/h2".format(test.folder))
-    
-    netem.cmd("mkdir -p {}/netem".format(test.folder))
-    netem.cmd("cd {}/netem".format(test.folder))
-
-    h1.cmd("mkdir -p ~/resultados/")
-    
-    # --------------------------------------------------------------------------
-    # Empezar a loguear info
-
     with open(test.log_path, "w") as log_file:
 
-        log_file.write(str(test) + "\n")
         log_file.write("------------------------------\n")
+        log_file.write(str(test) + "\n")
+        print ""
+        print "------------------------------"
+        print str(test)
+        print ""
+
+        # ------------------------------------------------------------------
+        # Crear topologia, configurar IPs, etc.
+        print "Creando topologia"
+
+        net = Mininet(topo=None, build=False)
+
+        netem = net.addHost('netem', cls=MiHost, defaultRoute=None)
+        h1 = net.addHost('h1', cls=MiHost, ip='10.0.0.10/8', defaultRoute='10.0.0.1')
+        h2 = net.addHost('h2', cls=MiHost, ip='11.0.0.10/8', defaultRoute='11.0.0.1')
+
+        netem_int1 = net.addLink(h1, netem).intf2
+        netem_int2 = net.addLink(h2, netem).intf2
+
+        net.build()
+        net.start()
+
+        time.sleep(1)
         
-        netem.logCmd(log_file, "tc qdisc show")
-        h1.logCmd(log_file, "sysctl net.ipv4.tcp_congestion_control")
-        h2.logCmd(log_file, "sysctl net.ipv4.tcp_congestion_control")
+        print "Configurando hosts"
+
+        netem_int1.setIP("10.0.0.1/8")
+        netem_int2.setIP("11.0.0.1/8")
+
+        h1.cmd(
+            "ip r add default via 10.0.0.1")
+        h2.cmd(
+            "ip r add default via 11.0.0.1")
+
+        netem.cmd(
+            "echo 1 > /proc/sys/net/ipv4/ip_forward")
+        netem.cmdLog(log_file,
+            "ip -c a")
+        h1.cmdLog(log_file,
+            "ip -c a")
+        h2.cmdLog(log_file,
+            "ip -c a")
+
+        h1.cmd(
+            "modprobe tcp_bbr")
+        h2.cmd(
+            "modprobe tcp_bbr")
+
+        h1.cmd(
+            "sysctl -w net.ipv4.tcp_congestion_control={}".format(test.tcp_cc))
+        h2.cmd(
+            "sysctl -w net.ipv4.tcp_congestion_control={}".format(test.tcp_cc))
+            
+        h1.cmdLog(log_file,
+            "sysctl net.ipv4.tcp_congestion_control")
+        h2.cmdLog(log_file,
+            "sysctl net.ipv4.tcp_congestion_control")
+
+        net.pingAll()
+
+        for controller in net.controllers:
+            controller.start()
 
         # --------------------------------------------------------------------------
-        # Servidor HTTP
+        # Configurar netem
+        print "Configurando netem"
 
-        # pushd hace cd a una carpeta. Lo que tiene de bueno es que cuando use popd
-        # puedo volver a la carpeta anterior
-        #h1.cmd("pushd /etc/apt/")
-        #h1.cmdPrint("ls")
+        # Poner netem solo en la interfaz de ida
 
-        #pid_py3 = h1.bgCmd("python3 -m http.server 8080")
-        #time.sleep(1)
+        intf = netem_int2.name
 
-        #h2.cmdPrint("ls")
-        #h2.cmdPrint("wget -r http://10.0.0.1:8080")
-        #h2.cmdPrint("ls")
+        netem.cmd(
+            "tc qdisc del dev {intf} root".format(intf=intf))
 
-        #h1.killPid(pid_py3)
-        #h1.cmd("popd")
+        if test.loss > 0:
+            loss_params = "loss {}% ".format(test.loss)
+        else:
+            loss_params = ""
+
+        if test.delay > 0 or test.jitter > 0:
+            delay_params = "delay {}ms {}ms {}%".format(test.delay, test.jitter, test.corr)
+        else:
+            delay_params = ""
+
+        netem.cmd(
+            "tc qdisc add dev {intf} root handle 1: netem {loss_params} {delay_params}"
+                .format(intf=intf, loss_params=loss_params, delay_params=delay_params))
+
+        if test.limit:
+            buf_params = "limit {}".format(test.limit)
+        else:
+            buf_params = "latency {}ms".format(test.latency)
+
+        netem.cmd(
+            "tc qdisc add dev {intf} parent 1: handle 2: tbf rate {bw}mbit burst {burst}kb {buf_params}"
+                .format(intf=intf, bw=test.bw, burst=test.burst, buf_params=buf_params))
+                
+        netem.cmdLog(log_file,
+            "tc qdisc show")
+
+        # --------------------------------------------------------------------------
+        # Crear carpetas temporales y moverse ahi
+        print "Preparando prueba"
+
+        h1.cmd((
+            "mkdir -p {test_folder}/h1;"
+            "cd {test_folder}/h1;").format(test_folder=test.folder))
+
+        h2.cmd((
+            "mkdir -p {test_folder}/h2;"
+            "cd {test_folder}/h2;").format(test_folder=test.folder))
+
+        netem.cmd((
+            "mkdir -p {test_folder}/netem;"
+            "cd {test_folder}/netem;").format(test_folder=test.folder))
 
         # --------------------------------------------------------------------------
         # Iperf3. Cliente (h1) manda a servidor (h2)
 
         # Iniciar servidor
-        
-        # El  /dev/null es para que no imprima nada en pantalla
-        pid_iperf = h2.bgCmd("iperf -s > /dev/null")
+
+        # El /dev/null es para que no imprima nada en pantalla
+        pid_iperf = h2.cmdBack(
+            "iperf -s > /dev/null")
         time.sleep(1)
-        
+
         # Iniciar capturas
 
-        h1.cmd("mkdir ./captcp_ss")
-        pid_tcpdump = h1.bgCmd("tcpdump -i h1-eth0 -w ./trace.pcap")
-        pid_captcp_ss = h1.bgCmd("captcp socketstatistic -s 100 -o ./captcp_ss") # 100Hz
-        pid_qlen = netem.bgCmd("qlen_plot.py {}".format(intf))
-        
+        h1.cmd(
+            "mkdir ./captcp_ss")
+        pid_tcpdump = h1.cmdBack(
+            "tcpdump -i h1-eth0 -w ./trace.pcap")
+            
+        # El /dev/null es para que no imprima nada en pantalla
+        pid_captcp_ss = h1.cmdBack(
+            "captcp socketstatistic -s 100 -o ./captcp_ss > /dev/null") # 100Hz
+        pid_qlen = netem.cmdBack(
+            "qlen_plot.py {}".format(intf))
+
         # Iniciar iperf
-        
-        h1.logCmd(log_file, "iperf -c 11.0.0.10 -t {}".format(test.duration))
+        print "Haciendo prueba..."
+
+        h1.cmdLog(log_file,
+            "iperf -c 11.0.0.10 -t {}".format(test.duration))
 
         # Parar capturas
-        
+
         time.sleep(1)
         print "Parando tcpdump"
         h1.killPid(pid_tcpdump)
@@ -219,83 +239,69 @@ def run_test(test):
         h2.killPid(pid_iperf)
         print "Parando qlen_plot"
         netem.killPid(pid_qlen)
-        
+
         # Graficar socketstatistic
 
         print "Graficando socketstatistic"
-        
-        h1.cmd("pushd ./captcp_ss/*:5001")
-        
-        h1.cmd("pushd ./cwnd-ssthresh")
-        h1.logCmd(log_file, "make")
-        h1.cmd("mkdir -p {}/ssthreshs/".format(test.resfolder))
-        h1.cmd("cp *.pdf {}/ssthreshs/{}.pdf".format(test.resfolder, test.name))
-        h1.cmd("popd")
-        
-        h1.cmd("pushd ./rtt")
-        h1.logCmd(log_file, "make")
-        h1.cmd("mkdir -p {}/rtts/".format(test.resfolder))
-        h1.cmd("cp *.pdf {}/rtts/{}.pdf".format(test.resfolder, test.name))
-        h1.cmd("popd")
-        
-        h1.cmd("pushd ./skmem")
-        h1.logCmd(log_file, "make")
-        h1.cmd("popd")
-        
-        h1.cmd("popd")
-        
+
+        h1.cmdLog(log_file, (
+            "pushd ./captcp_ss/*:5001;"
+            
+            "pushd ./cwnd-ssthresh;"
+            "make;"
+            "mkdir -p {test.resfolder}/ssthreshs/;"
+            "cp *.pdf {test.resfolder}/ssthreshs/{test.name}.pdf;"
+            "popd;"
+
+            "pushd ./rtt;"
+            "make;"
+            "mkdir -p {test.resfolder}/rtts/;"
+            "cp *.pdf {test.resfolder}/rtts/{test.name}.pdf;"
+            "popd;"
+            
+            "pushd ./skmem;"
+            "make;"
+            "popd;"
+            "popd;").format(test=test))
+
         # Graficar throughput
-        
+
         print "Determinando el numero de flow capturado"
 
-        salida = h1.cmd("captcp statistic ./trace.pcap | grep -E 'Flow|Data application layer' | ansi2txt")
+        salida = h1.cmd(
+            "captcp statistic ./trace.pcap | grep -E 'Flow|Data application layer' | ansi2txt")
         flow = parse.parse_captcp_stat(salida)
-        
+
         print "Graficando throughput"
 
-        h1.cmd('mkdir -p "./captcp_throughput"')
-        h1.cmd(
-            "captcp throughput -ps {sample_len} -i -u Mbit \
-            -f {flow} -o {output_dir} {pcap}".format(
-                sample_len="0.1",
-                flow=flow,
-                output_dir="./captcp_throughput",
-                pcap="./trace.pcap"
-            )
-        )
-        h1.cmd("pushd ./captcp_throughput")
-        h1.cmd("make")
-        h1.cmd("mkdir -p {}/throughputs/".format(test.resfolder))
-        h1.cmd("cp *.pdf {}/throughputs/{}.pdf".format(test.resfolder, test.name))
-        h1.cmd("popd")
-        
-        # Graficar inflight
-        
-        print "Graficar inflight"
+        h1.cmdLog(log_file, (
+            'mkdir -p "./captcp_throughput";'
+            "captcp throughput -ps 0.1 -i -u Mbit -f {flow} -o ./captcp_throughput ./trace.pcap;"
+            "pushd ./captcp_throughput;"
+            "make;"
+            "mkdir -p {test.resfolder}/throughputs/;"
+            "cp *.pdf {test.resfolder}/throughputs/{test.name}.pdf;"
+            "popd;").format(test=test, flow=flow))
 
-        h1.cmd('mkdir -p "./captcp_inflight"')
+        # Graficar inflight
+
+        print "Graficando inflight"
+
+        h1.cmdLog(log_file, (
+            "mkdir -p ./captcp_inflight;"
+            "captcp inflight -i -f {flow} -o ./captcp_inflight ./trace.pcap;"
+            "pushd ./captcp_inflight;"
+            "make;"
+            "mkdir -p {test.resfolder}/inflights/;"
+            "cp *.pdf {test.resfolder}/inflights/{test.name}.pdf;"
+            "popd;").format(test=test, flow=flow))
+
         h1.cmd(
-            "captcp inflight -i -f {flow} -o {output_dir} {pcap}".format(
-                flow=flow,
-                output_dir="./captcp_inflight",
-                pcap="./trace.pcap"
-            )
-        )
-        h1.cmd("pushd ./captcp_inflight")
-        h1.cmd("make")
-        h1.cmd("mkdir -p {}/inflights/".format(test.resfolder))
-        h1.cmd("cp *.pdf {}/inflights/{}.pdf".format(test.resfolder, test.name))
-        h1.cmd("popd")
-        
-        h1.cmd("rm ./trace.pcap")
-        
-        # Copiar grafico de qlen
-        
-        netem.cmd("mkdir -p {}/qlen/".format(test.resfolder))
-        netem.cmd("cp ./*.png {}/qlen/{}.png".format(test.resfolder, test.name))
-        
+            "rm ./trace.pcap")
+
         # Graficando con matplotlib
-        
+        print "Graficando con matplotlib"
+
         plot(
             name=test.name,
             data_paths={
@@ -318,13 +324,13 @@ def run_test(test):
         print "Proceso de h2 no salio"
     if not h1.waiting and not h2.waiting:
         print "Los procesos de h1 y h2 terminaron"
-        
+
     net.stop()
-        
+
 class TestDef:
-    
+
     total_tests = 0 # Llevar cuenta de cantidad de tests
-    
+
     def __init__(
         self,
         tcp_cc="reno", # Congestion control: reno, cubic, bbr, bbr2
@@ -339,10 +345,10 @@ class TestDef:
         duration=20 # Duracion de prueba en segundos
     ):
         TestDef.total_tests += 1
-        
+
         # Numero de test
         self.test_num = TestDef.total_tests
-        
+
         self.tcp_cc = tcp_cc
         self.bw = bw
         self.burst = burst
@@ -353,7 +359,7 @@ class TestDef:
         self.corr = corr
         self.loss = loss
         self.duration = duration
-        
+
         # Nombre unico, pensado para usarse como nombre de archivo
         self.name = "{test_num}_{tcp_cc}_{bw}mbps_buf{latency}ms_limit{limit}_{delay}~{jitter}ms_{loss}%".format(
             tcp_cc=tcp_cc,
@@ -367,172 +373,178 @@ class TestDef:
             loss=loss,
             test_num=self.test_num,
         )
-        
+
         self.folder = "/var/tmp/mininet/{}/".format(self.name)
-        
+
         self.resfolder = "/var/tmp/mininet/res/"
-        
+
         self.log_path = "{}/log.txt".format(self.folder)
-        
+
     def __str__(self):
         """
         Se imprime a si mismo para loguearse
         """
         return self.name
-        
-def escenario_1():
-    
-    tests = []
-    
-    tcp_ccs = ["reno", "cubic", "bbr", "bbr2"]
-    
-    for tcp_cc in tcp_ccs:
-        
-        tests.append(TestDef(
-            tcp_cc=tcp_cc,
-            bw=10, # Mbps
-            burst=32, # kbytes
-            latency=50, # ms
-            delay=100, # ms
-            jitter=0, # ms
-            corr=25, # %
-            loss=0, # %
-            duration=20 # s
-        ))
-    
-    for t in tests:
-        run_test(t)
-        
-def escenario_2():
-    
-    tests = []
-    
-    tcp_ccs = ["bbr", "bbr2"]
-    
-    for tcp_cc in tcp_ccs:
-        bw = 100
-        tests.append(TestDef(
-            tcp_cc=tcp_cc,
-            bw=bw, # Mbps
-            burst=int(bw*1000/250/8), # kbytes, https://unix.stackexchange.com/a/100797
-            latency=100, # ms
-            delay=100, # ms
-            jitter=0, # ms
-            corr=25, # %
-            loss=0, # %
-            duration=60 # s
-        ))
-    
-    for t in tests:
-        run_test(t)
-        
-def escenario_3():
-    
-    tests = []
-    
-    tcp_ccs = ["reno", "cubic", "bbr", "bbr2"]
-    
-    for tcp_cc in tcp_ccs:
-        bw = 100
-        tests.append(TestDef(
-            tcp_cc=tcp_cc,
-            bw=bw, # Mbps
-            burst=int(bw*1000/250/8), # kbytes, https://unix.stackexchange.com/a/100797
-            latency=100, # ms
-            delay=100, # ms
-            jitter=0, # ms
-            corr=25, # %
-            loss=0.5, # %
-            duration=10 # s
-        ))
-    
-    for t in tests:
-        run_test(t)
-        
-def escenario_4():
-    
-    tests = []
-    
-    tcp_ccs = ["reno", "bbr", "bbr2"]
-    
-    for tcp_cc in tcp_ccs:
-        bw = 100
-        tests.append(TestDef(
-            tcp_cc=tcp_cc,
-            bw=bw, # Mbps
-            burst=int(bw*1000/250/8), # kbytes, https://unix.stackexchange.com/a/100797
-            latency=50, # ms
-            delay=50, # ms
-            jitter=0, # ms
-            corr=25, # %
-            loss=0, # %
-            duration=60 # s
-        ))
-    
-    for t in tests:
-        run_test(t)
-        
-def escenario_5():
-    
-    tests = []
-    
-    tcp_ccs = ["reno", "bbr", "bbr2"]
-    bw = 100
-    delay = 200
-    BDP = int(bw*1000000 * delay/1000)
-    
-    for tcp_cc in tcp_ccs:
-        tests.append(TestDef(
-            tcp_cc=tcp_cc,
-            bw=bw, # Mbps
-            burst=int(bw*1000/250/8), # kbytes, https://unix.stackexchange.com/a/100797
-            limit=int(BDP/100), # bytes
-            delay=50, # ms
-            jitter=0, # ms
-            corr=25, # %
-            loss=0, # %
-            duration=60 # s
-        ))
-    
-    for t in tests:
-        run_test(t)
-        
-def prueba():
-    
-    tests = []
-    
-    tcp_ccs = ["bbr", "bbr2"]
-    bws = [100] # Mbps
-    latencies = [30] # ms
-    delays = [30] # ms
-    jitters = [0] # ms
-    corrs = [25] # %
-    losses = [0] # %
-    
-    for tcp_cc, bw, latency, delay, jitter, corr, loss in itertools.product(
-            tcp_ccs, bws, latencies, delays, jitters, corrs, losses):
-        
-        BDP = bw*1000000 * delay/1000
-        tests.append(TestDef(
-            tcp_cc=tcp_cc,
-            bw=bw, # Mbps
-            burst=int(bw*1000/250/8), # kbytes, https://unix.stackexchange.com/a/100797
-            latency=latency, # ms
-            delay=delay, # ms
-            jitter=jitter, # ms
-            corr=corr, # %
-            loss=loss, # %
-            duration=60 # s
-        ))
-    
-    for t in tests:
-        run_test(t)
 
-if __name__ == '__main__':
-    setLogLevel( 'info' )
-    
+
+def main(escenario):
+    # Borrar resultados de pruebas anteriores
     shutil.rmtree("/var/tmp/mininet", ignore_errors=True)
     
-    escenario_3()
+    if escenario == 1:
+
+        tests = []
+
+        tcp_ccs = ["reno", "cubic", "bbr", "bbr2"]
+
+        for tcp_cc in tcp_ccs:
+
+            tests.append(TestDef(
+                tcp_cc=tcp_cc,
+                bw=10, # Mbps
+                burst=32, # kbytes
+                latency=50, # ms
+                delay=100, # ms
+                jitter=0, # ms
+                corr=25, # %
+                loss=0, # %
+                duration=20 # s
+            ))
+
+        for t in tests:
+            run_test(t)
+
+    elif escenario == 2:
+
+        tests = []
+
+        tcp_ccs = ["bbr", "bbr2"]
+
+        for tcp_cc in tcp_ccs:
+            bw = 100
+            tests.append(TestDef(
+                tcp_cc=tcp_cc,
+                bw=bw, # Mbps
+                burst=int(bw*1000/250/8), # kbytes, https://unix.stackexchange.com/a/100797
+                latency=100, # ms
+                delay=100, # ms
+                jitter=0, # ms
+                corr=25, # %
+                loss=0, # %
+                duration=60 # s
+            ))
+
+        for t in tests:
+            run_test(t)
+
+    elif escenario == 3:
+
+        tests = []
+
+        tcp_ccs = ["reno", "cubic", "bbr", "bbr2"]
+
+        for tcp_cc in tcp_ccs:
+            bw = 100
+            tests.append(TestDef(
+                tcp_cc=tcp_cc,
+                bw=bw, # Mbps
+                burst=int(bw*1000/250/8), # kbytes, https://unix.stackexchange.com/a/100797
+                latency=100, # ms
+                delay=100, # ms
+                jitter=0, # ms
+                corr=25, # %
+                loss=0.5, # %
+                duration=10 # s
+            ))
+
+        for t in tests:
+            run_test(t)
+
+    elif escenario == 4:
+
+        tests = []
+
+        tcp_ccs = ["reno", "bbr", "bbr2"]
+
+        for tcp_cc in tcp_ccs:
+            bw = 100
+            tests.append(TestDef(
+                tcp_cc=tcp_cc,
+                bw=bw, # Mbps
+                burst=int(bw*1000/250/8), # kbytes, https://unix.stackexchange.com/a/100797
+                latency=50, # ms
+                delay=50, # ms
+                jitter=0, # ms
+                corr=25, # %
+                loss=0, # %
+                duration=60 # s
+            ))
+
+        for t in tests:
+            run_test(t)
+
+    elif escenario == 5:
+
+        tests = []
+
+        tcp_ccs = ["reno", "bbr", "bbr2"]
+        bw = 100
+        delay = 200
+        BDP = int(bw*1000000 * delay/1000)
+
+        for tcp_cc in tcp_ccs:
+            tests.append(TestDef(
+                tcp_cc=tcp_cc,
+                bw=bw, # Mbps
+                burst=int(bw*1000/250/8), # kbytes, https://unix.stackexchange.com/a/100797
+                limit=int(BDP/100), # bytes
+                delay=50, # ms
+                jitter=0, # ms
+                corr=25, # %
+                loss=0, # %
+                duration=60 # s
+            ))
+
+        for t in tests:
+            run_test(t)
+
+    elif escenario == 0:
+
+        tests = []
+
+        tcp_ccs = ["bbr", "bbr2"]
+        bws = [100] # Mbps
+        latencies = [30] # ms
+        delays = [30] # ms
+        jitters = [0] # ms
+        corrs = [25] # %
+        losses = [0] # %
+
+        for tcp_cc, bw, latency, delay, jitter, corr, loss in itertools.product(
+                tcp_ccs, bws, latencies, delays, jitters, corrs, losses):
+
+            BDP = bw*1000000 * delay/1000
+            tests.append(TestDef(
+                tcp_cc=tcp_cc,
+                bw=bw, # Mbps
+                burst=int(bw*1000/250/8), # kbytes, https://unix.stackexchange.com/a/100797
+                latency=latency, # ms
+                delay=delay, # ms
+                jitter=jitter, # ms
+                corr=corr, # %
+                loss=loss, # %
+                duration=2 # s
+            ))
+
+        for t in tests:
+            run_test(t)
+            
+    else:
+        print("Escenario {} no existe".format(escenario))
+
+if __name__ == '__main__':
+    setLogLevel( 'warning' )
+
+    main(escenario=1)
     # TODO: Tomar desde argv
 
