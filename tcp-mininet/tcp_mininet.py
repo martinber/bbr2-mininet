@@ -4,6 +4,7 @@ import time
 import signal
 import os
 import shutil
+import sys
 import itertools
 from glob import glob
 
@@ -394,8 +395,8 @@ def main(escenario):
                 tcp_cc=tcp_cc,
                 bw=bw, # Mbps
                 burst=int(bw*1000/250/8), # kbytes, https://unix.stackexchange.com/a/100797
-                latency=100, # ms
-                delay=100, # ms
+                latency=30, # ms
+                delay=30, # ms
                 jitter=0, # ms
                 corr=25, # %
                 loss=0, # %
@@ -501,7 +502,7 @@ def main(escenario):
                 jitter=jitter, # ms
                 corr=corr, # %
                 loss=loss, # %
-                duration=2 # s
+                duration=10 # s
             ))
 
         for t in tests:
@@ -513,6 +514,10 @@ def main(escenario):
 if __name__ == '__main__':
     setLogLevel( 'warning' )
 
-    main(escenario=1)
-    # TODO: Tomar desde argv
+    try:
+        escenario = int(sys.argv[1])
+    except:
+        print "Ejecutar programa indicando el numero de escenario como argumento"
+        sys.exit()
 
+    main(escenario)
