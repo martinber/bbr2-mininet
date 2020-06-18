@@ -803,7 +803,7 @@ class Router(Node):
             "bfdd": 0,
             "sharpd": 0,
         }
-        self.daemons_options = {"zebra": ""}
+        self.daemons_options = {"zebra": "", "bgpd": "", "staticd": ""}
         self.reportCores = True
         self.version = None
 
