@@ -330,7 +330,7 @@ class TestDef:
         self.duration = duration
 
         # Nombre unico, pensado para usarse como nombre de archivo
-        self.name = "{test_num}_{tcp_cc}_{bw}mbps_buf{latency}ms_limit{limit}_{delay}~{jitter}ms_{loss}%".format(
+        self.name = "{test_num}_{tcp_cc}_{bw}mbps_{delay}~{jitter}ms_{loss}%_buf{latency}ms-limit{limit}_burst{burst}kb".format(
             tcp_cc=tcp_cc,
             bw=bw,
             burst=burst,
